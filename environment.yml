@@ -9,4 +9,7 @@ dependencies:
   - pandas
   - pytorch
   - matplotlib
+  - seaborn
   - pip
+  - pip:
+      - gym
