@@ -1,15 +1,23 @@
 name: reinforcement_learning
 channels:
+  - nvidia
+  - pytorch
   - conda-forge
   - defaults
-  - pytorch
 dependencies:
   - python=3.9
   - numpy=1.21.0
   - pandas
   - pytorch
+  - torchvision
+  - torchaudio
+  - torchmetrics
   - matplotlib
   - seaborn
+  - tqdm
+  - imageio
+  - cudatoolkit=11.7
   - pip
   - pip:
-      - gym
+      - gym[atari, accept-rom-licence]
+      - opencv-python
