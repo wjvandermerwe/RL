@@ -6,18 +6,13 @@ channels:
   - defaults
 dependencies:
   - python=3.9
-  - numpy=1.21.0
-  - pandas
+  - numpy=1.21.1
   - pytorch
-  - torchvision
-  - torchaudio
-  - torchmetrics
-  - matplotlib
-  - seaborn
-  - tqdm
-  - imageio
   - cudatoolkit=11.7
-  - pip
+  - matplotlib
+  - imageio
+  - pip=21.0
   - pip:
-      - gym[atari, accept-rom-licence]
+      - gym==0.22.0
+      - gym[atari,accept-rom-license]
       - opencv-python

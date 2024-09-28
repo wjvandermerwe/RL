@@ -1,8 +1,12 @@
+import os
+
 from gym import spaces
 import numpy as np
 import torch
 from dqn.model import DQN
 from dqn.replay_buffer import ReplayBuffer
+
+from Lab3.code.dqn.wrappers import LazyFrames
 
 device = "cuda"
 
@@ -13,7 +17,6 @@ class DQNAgent:
         observation_space: spaces.Box,
         action_space: spaces.Discrete,
         replay_buffer: ReplayBuffer,
-        use_double_dqn,
         lr,
         batch_size,
         gamma,
@@ -31,7 +34,6 @@ class DQNAgent:
         self.batch_size = batch_size
         self.gamma = gamma
         self.replay_buffer = replay_buffer
-        self.use_double_dqn = use_double_dqn
         self.num_actions = action_space.n
         self.policy_network = DQN(observation_space, action_space).to(self.device)
         self.target_network = DQN(observation_space, action_space).to(self.device)
@@ -39,7 +41,7 @@ class DQNAgent:
         self.target_network.eval()
         self.optimizer = torch.optim.Adam(lr=lr, params=self.policy_network.parameters())
         self.loss_fn = torch.nn.MSELoss()
-
+        self.checkpoint_dir = "./checkpoints"
     def optimise_td_loss(self):
         """
         Optimise the TD-error over a single minibatch of transitions
@@ -78,7 +80,6 @@ class DQNAgent:
         """
         Update the target Q-network by copying the weights from the current Q-network
         """
-        # update target_network parameters with policy_network parameters
         self.target_network.load_state_dict(self.policy_network.state_dict())
 
     def act(self, state: np.ndarray, eps: float = 0.0):
@@ -87,16 +88,44 @@ class DQNAgent:
         :param state: the current state
         :return: the action to take
         """
-        # Select action greedily from the Q-network given the state
+        state_tensor = torch.from_numpy(np.array(state)).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            q_values = self.policy_network(state_tensor)
+            q_values_np = q_values.cpu().numpy()[0]
+
         if np.random.rand() < eps:
-            # Exploration: choose a random action
-            return np.random.randint(self.num_actions)
+            action = np.random.randint(self.num_actions)
         else:
-            # Exploitation: choose the best action according to the policy network
-            state = torch.from_numpy(state).unsqueeze(0).to(self.device)  # Add batch dimension
+            action = np.argmax(q_values_np)
 
-            with torch.no_grad():
-                q_values = self.policy_network(state)
-                action = q_values.max(1)[1].item()  # Get the index of the max Q-value
+        q_value_of_action = q_values_np[action]
 
-            return action
+        return action, q_value_of_action
+
+    def save_checkpoint(self, step, episode):
+        """
+        Save model and optimizer state to a checkpoint file
+        :param step: current training step
+        :param episode: current episode number
+        """
+        if not os.path.exists(self.checkpoint_dir):
+            os.makedirs(self.checkpoint_dir)
+        checkpoint_path = os.path.join(self.checkpoint_dir, f"checkpoint_{episode}_{step}.pth")
+        torch.save({
+            'step': step,
+            'episode': episode,
+            'model_state_dict': self.policy_network.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+        }, checkpoint_path)
+        print(f"Checkpoint saved at: {checkpoint_path}")
+
+    def load_checkpoint(self, checkpoint_path):
+        """
+        Load model and optimizer state from a checkpoint file
+        :param checkpoint_path: path to the checkpoint file
+        """
+        checkpoint = torch.load(checkpoint_path)
+        self.policy_network.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        print(f"Checkpoint loaded from: {checkpoint_path}")
+        return checkpoint['step'], checkpoint['episode']
